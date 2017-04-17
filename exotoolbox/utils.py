@@ -24,6 +24,18 @@ def get_phases(t,P,t0):
             phase = phase - 1.0
     return phase
 
+def mag_to_flux(m,merr):
+    """
+    Convert magnitude to relative fluxes. 
+    """
+    fluxes = np.zeros(len(m))
+    fluxes_err = np.zeros(len(m))
+    for i in range(len(m)):
+        dist = 10**(-np.random.normal(m[i],merr[i],1000)/2.51)
+        fluxes[i] = np.mean(dist)
+        fluxes_err[i] = np.sqrt(np.var(dist))
+    return fluxes,fluxes_err
+
 def init_batman(t,law):
     """
     This function initializes the batman code.
@@ -36,8 +48,11 @@ def init_batman(t,law):
     params.inc = 87.
     params.ecc = 0.
     params.w = 90.
-    params.u = [0.1,0.3]
     params.limb_dark = law
+    if law != 'linear':
+        params.u = [0.1,0.3]
+    else:
+        params.u = [0.1]
     m = batman.TransitModel(params,t)
     return params,m
 
@@ -55,7 +70,10 @@ def get_transit_model(t,t0,P,p,a,inc,q1,q2,ld_law):
     params.rp = p
     params.a = a
     params.inc = inc
-    params.u = [coeff1,coeff2]
+    if ld_law != 'linear':
+        params.u = [coeff1,coeff2]
+    else:
+        params.u = [coeff1]
     return m.light_curve(params)
 
 def convert_ld_coeffs(ld_law, coeff1, coeff2):
@@ -168,7 +186,10 @@ def transit_predictor(year,month,pname=None,day=None,P=None,Tdur=None,t0=None,ex
         names = ["User's planet"]
 
     if pname is None:
-        planet_list = exodata.keys()
+        if P is None or Tdur is None or t0 is None:
+            planet_list = exodata.keys()
+        else:
+            planet_list = names
     else:
         corrected_input = ''.join(ch for ch in pname if ch.isalnum())
         for planet in exodata.keys():
