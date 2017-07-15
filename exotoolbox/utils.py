@@ -1,4 +1,7 @@
+# -*- coding: utf-8 -*-
 import batman
+import emcee
+import sys
 import numpy as np
 
 def get_MAD_sigma(x,median):
@@ -23,6 +26,40 @@ def get_phases(t,P,t0):
         if phase>=0.5:
             phase = phase - 1.0
     return phase
+
+def get_quantiles(dist,alpha = 0.68, method = 'median'):
+    """
+    get_quantiles function
+
+    DESCRIPTION
+
+        This function returns, in the default case, the parameter median and the error% 
+        credibility around it. This assumes you give a non-ordered 
+        distribution of parameters.
+
+    OUTPUTS
+
+        Median of the parameter,upper credibility bound, lower credibility bound
+
+    """
+    ordered_dist = dist[np.argsort(dist)]
+    param = 0.0
+    # Define the number of samples from posterior
+    nsamples = len(dist)
+    nsamples_at_each_side = int(nsamples*(alpha/2.)+1)
+    if(method == 'median'):
+       med_idx = 0
+       if(nsamples%2 == 0.0): # Number of points is even
+          med_idx_up = int(nsamples/2.)+1
+          med_idx_down = med_idx_up-1
+          param = (ordered_dist[med_idx_up]+ordered_dist[med_idx_down])/2.
+          return param,ordered_dist[med_idx_up+nsamples_at_each_side],\
+                 ordered_dist[med_idx_down-nsamples_at_each_side]
+       else:
+          med_idx = int(nsamples/2.)
+          param = ordered_dist[med_idx]
+          return param,ordered_dist[med_idx+nsamples_at_each_side],\
+                 ordered_dist[med_idx-nsamples_at_each_side]
 
 def mag_to_flux(m,merr):
     """
@@ -56,7 +93,7 @@ def init_batman(t,law):
     m = batman.TransitModel(params,t)
     return params,m
 
-def get_transit_model(t,t0,P,p,a,inc,q1,q2,ld_law):
+def get_transit_model(t,t0,P,p,a,inc,q1,q2,ecc,omega,ld_law):
     """
     Given input times and transit parameters, returns a transit 
     model. ld_law can be 'quadratic', 'squareroot' or 
@@ -70,6 +107,8 @@ def get_transit_model(t,t0,P,p,a,inc,q1,q2,ld_law):
     params.rp = p
     params.a = a
     params.inc = inc
+    params.ecc = ecc
+    params.w = omega
     if ld_law != 'linear':
         params.u = [coeff1,coeff2]
     else:
@@ -101,6 +140,475 @@ def reverse_ld_coeffs(ld_law, q1, q2):
     elif ld_law=='linear':
         return q1,0.
     return coeff1,coeff2
+
+def emcee_transit(t,f,X,priors,ferr = None,fixed_parameters=None,ld_law='quadratic',noise_model = 'white',nburnin=500,nsteps=500,nwalkers=100):
+    """
+    This simple function fits a transit lightcurve + linear model to a given time (t) and 
+    flux (f) pair using the emcee sampler. The components of the linear model are assumed 
+    to be in the rows of the matrix X, and the priors for each of the parameters are expected to 
+    go in the priors dictionary, containing the variable names (see below). The priors for the 
+    components in the matrix X are supposed to go as 'x0', 'x1', etc. 
+
+    Optionally, fixed_parameters is a dictionary that is supposed to contain the transit parameters 
+    to be held fixed (e.g., fixed_parameters['t0'] = 2450000.0). Valid values for fixed_parameters are 
+    'q1', 'q2', 'a/R*', 'p', 't0', 'ecc', 'omega', 'inc', 'sigma', 'x0', 'x1', etc.
+
+    If noise_model = 'white', noise is assumed to be 'white gaussian', i.e., i.i.d. with parameter 'sigma_w', where 
+    'sigma_w' is in ppm.
+
+    Setting the priors
+    ------------------
+
+    The 'priors' dictionary is supposed to have three internal elements. A 'type', where you specify 
+    the type of the prior, a 'parameters', where you specify the parameters of that prior and a 'initial_value',
+    where you specify the starting point from which the MCMC will run for that parameter. Currently 
+    supported types of priors are 'Gaussian', 'Uniform', 'Beta' and 'Jeffreys'. 
+
+    To set a prior for parameter 't0' as 'Gaussian' with mean mu and standard deviation sigma, you would do:
+                                >> priors['t0'] = {}
+                                >> priors['type'] = 'Gaussian'
+                                >> priors['parameters'] = [mu,sigma]
+                                >> priors['initial_value'] = 0.1
+    To set a uniform prior for the same parameter with lower limit a and upper limit b, you would do:
+                                >> priors['t0'] = {}
+                                >> priors['type'] = 'Uniform'
+                                >> priors['parameters'] = [a,b]
+                                >> priors['initial_value'] = (a+b)/2
+    Similarly for a Jeffreys prior:
+                                >> priors['t0'] = {}
+                                >> priors['type'] = 'Jeffreys'
+                                >> priors['parameters'] = [a,b]
+                                >> priors['initial_value'] = (a+b)/2
+    And for a Beta prior (always between 0 and 1):
+                                >> priors['t0'] = {}
+                                >> priors['type'] = 'Beta'
+                                >> priors['parameters'] = [a,b]
+                                >> priors['initial_value'] = (a+b)/2
+
+    """
+ 
+    # Initial setups:
+    supported_priors = ['Gaussian','Uniform','Jeffreys','Beta']
+    priors_that_need_checking = ['Uniform','Jeffreys','Beta']
+    supported_priors_objects = [normal_parameter,uniform_parameter,jeffreys_parameter,beta_parameter]
+    if ferr is None:
+        ferr = np.zeros(len(t))
+    # First, set parameters:
+    if noise_model == 'white':
+        all_parameters = ['sigma_w']
+    parameters_to_check = []
+    for i in range(X.shape[0]):
+        all_parameters = all_parameters + ['x'+str(i)]
+    if ld_law == 'linear':
+        transit_parameters = ['p','P','t0','a','inc','ecc','omega','q1']
+    else:
+        transit_parameters = ['p','P','t0','a','inc','ecc','omega','q1','q2']
+    all_parameters = all_parameters + transit_parameters
+    parameters = {}
+    all_mcmc_params = []
+    for par in all_parameters:
+        if par in priors.keys():
+            good_prior = False
+            for i in range(len(supported_priors)):
+                if priors[par]['type'] == supported_priors[i]:
+                    parameters[par] = supported_priors_objects[i](priors[par]['parameters'])
+                    parameters[par].set_value(priors[par]['initial_value'])
+                    if priors[par]['type'] in priors_that_need_checking:
+                        parameters_to_check.append(par)
+                    good_prior = True
+                    all_mcmc_params.append(par)
+                    break
+            if not good_prior:
+                print '\t ERROR: prior '+priors[par]['type']+' for parameter '+par+\
+                      ' not supported. Supported priors are: ',supported_priors
+                sys.exit()
+                
+        else:
+            parameters[par] = constant_parameter(fixed_parameters[par])
+
+    n_params = len(all_mcmc_params)
+    n_data = len(t)
+    log2pi = np.log(2.*np.pi)
+
+    # Initialize ta-na-na-na-na-na-na-na-na-na...batman!
+    params,m = init_batman(t,ld_law)
+
+    def lnlike():
+        # First, compute transit model:
+        if ld_law != 'linear':
+            coeff1,coeff2 = reverse_ld_coeffs(ld_law, parameters['q1'].value,parameters['q2'].value)
+            params.u = [coeff1,coeff2]
+        else: 
+            params.u = [parameters['q1'].value]
+        params.t0 = parameters['t0'].value
+        params.per = parameters['P'].value
+        params.rp = parameters['p'].value
+        params.a = parameters['a'].value
+        params.inc = parameters['inc'].value
+        params.ecc = parameters['ecc'].value
+        params.w = parameters['omega'].value
+        transit_model = m.light_curve(params)
+        # Compute linear model:
+        linear_model = 0.
+        for i in range(X.shape[0]):
+            linear_model = linear_model + X[i,:]*parameters['x'+str(i)].value
+        # Generate full model and residuals:
+        residuals = (np.log10(f) - linear_model - np.log10(transit_model))
+        if noise_model == 'white':
+            taus = 1.0/(parameters['sigma_w'].value*1e-6/(f*np.log(10.)))**2
+            log_like = -0.5*(n_data*log2pi+np.sum(np.log(1./taus)+taus*(residuals**2)))
+        else:
+            print 'Noise model '+noise_model+' not supported.'
+            sys.exit()
+        return log_like
+
+    def lnprior(theta):
+        # Read in the values of the parameter vector and update values of the objects.
+        # For each one, if everything is ok, get the total prior, which is the sum 
+        # of the independant priors for each parameter:
+        total_prior = 0.0
+        for i in range(n_params):
+            c_param = all_mcmc_params[i]
+            parameters[c_param].set_value(theta[i])
+            if c_param in parameters_to_check:
+                if not parameters[c_param].check_value(theta[i]):
+                    return -np.inf
+            total_prior += parameters[c_param].get_ln_prior()
+        return total_prior
+
+    def lnprob(theta):
+        lp = lnprior(theta)
+        if not np.isfinite(lp):
+                return -np.inf
+        return lp + lnlike()
+
+    # Start the MCMC around the points given by the user:
+    pos = []
+
+    for j in range(nwalkers):
+        while True:
+            good_values = True
+            theta_vector = np.array([])
+            for i in range(n_params):
+                par = all_mcmc_params[i]
+                # Put the walkers around a small gaussian sphere centered on the input user value. 
+                # Walkers will run away from sphere eventually:
+                theta_vector = np.append(theta_vector,parameters[par].value + \
+                                         (parameters[par].value-parameters[par].sample())*1e-3)
+                if par in parameters_to_check:
+                    if not parameters[par].check_value(theta_vector[-1]):
+                        good_values = False
+                        break
+            if good_values == True:
+                break
+        pos.append(theta_vector) 
+    print '\t >> Starting MCMC...'
+    sampler = emcee.EnsembleSampler(nwalkers, n_params, lnprob)
+    sampler.run_mcmc(pos, nsteps+nburnin)
+    print '\t >> Done! Saving...'
+    for i in range(n_params):
+        c_param = all_mcmc_params[i]
+        c_p_chain = np.array([])
+        for walker in range(nwalkers):
+            c_p_chain = np.append(c_p_chain,sampler.chain[walker,nburnin:,i])
+        parameters[c_param].set_posterior(np.copy(c_p_chain))
+    return parameters
+
+# Here I define some useful classes for the emcee transit MCMC procedures:
+class normal_parameter:
+      """
+      Description
+      -----------
+
+      This class defines a parameter object which has a normal prior. It serves 
+      to save both the prior and the posterior chains for an easier check of the parameter.
+
+      """   
+      def __init__(self,prior_hypp):
+          self.value = prior_hypp[0]
+          self.init_value = prior_hypp[0]
+          self.value_u = 0.0
+          self.value_l = 0.0
+          self.has_guess = False
+          self.prior_hypp = prior_hypp
+          self.posterior = []
+
+      def get_ln_prior(self):
+          return np.log(1./np.sqrt(2.*np.pi*(self.prior_hypp[1]**2)))-\
+                 0.5*(((self.prior_hypp[0]-self.value)**2/(self.prior_hypp[1]**2)))
+
+      def set_value(self,new_val):
+          self.value = new_val
+
+      def set_init_value(self,new_val):
+          self.init_value = new_val    
+          self.has_guess = True
+
+      def set_posterior(self,posterior_chain):
+          self.posterior = posterior_chain
+          param, param_u, param_l = get_quantiles(posterior_chain)
+          self.value = param
+          self.value_u = param_u
+          self.value_l = param_l
+      def sample(self):
+          return np.random.normal(self.prior_hypp[0],self.prior_hypp[1])
+
+class uniform_parameter:
+      """
+      Description
+      -----------
+
+      This class defines a parameter object which has a uniform prior. It serves 
+      to save both the prior and the posterior chains for an easier check of the parameter.
+
+      """
+      def __init__(self,prior_hypp):
+          self.value = (prior_hypp[0]+prior_hypp[1])/2.
+          self.init_value = (prior_hypp[0]+prior_hypp[1])/2.
+          self.value_u = 0.0
+          self.value_l = 0.0
+          self.has_guess = False
+          self.prior_hypp = prior_hypp
+          self.posterior = []
+
+      def get_ln_prior(self):
+          return np.log(1./(self.prior_hypp[1]-self.prior_hypp[0]))
+
+      def check_value(self,x):
+          if x > self.prior_hypp[0] and  x < self.prior_hypp[1]:
+              return True
+          else:
+              return False  
+ 
+      def set_value(self,new_val):
+          self.value = new_val
+
+      def set_init_value(self,new_val):
+          self.init_value = new_val
+          self.has_guess = True
+
+      def set_posterior(self,posterior_chain):
+          self.posterior = posterior_chain
+          param, param_u, param_l = get_quantiles(posterior_chain)
+          self.value = param
+          self.value_u = param_u
+          self.value_l = param_l
+      def sample(self):
+          return np.random.uniform(self.prior_hypp[0],self.prior_hypp[1])
+
+log1 = np.log(1)
+class jeffreys_parameter:
+      """
+      Description
+      -----------
+
+      This class defines a parameter object which has a Jeffreys prior. It serves 
+      to save both the prior and the posterior chains for an easier check of the parameter.
+
+      """
+      def __init__(self,prior_hypp):
+          self.value = np.sqrt(prior_hypp[0]*prior_hypp[1])
+          self.init_value = np.sqrt(prior_hypp[0]*prior_hypp[1])
+          self.value_u = 0.0
+          self.value_l = 0.0
+          self.has_guess = False
+          self.prior_hypp = prior_hypp
+          self.posterior = []
+
+      def get_ln_prior(self):
+          return log1 - np.log(self.value*np.log(self.prior_hypp[1]/self.prior_hypp[0]))
+
+      def check_value(self,x):
+          if x > self.prior_hypp[0] and  x < self.prior_hypp[1]:
+              return True
+          else:
+              return False
+
+      def set_value(self,new_val):
+          self.value = new_val
+
+      def set_init_value(self,new_val):
+          self.init_value = new_val
+          self.has_guess = True
+
+      def set_posterior(self,posterior_chain):
+          self.posterior = posterior_chain
+          param, param_u, param_l = get_quantiles(posterior_chain)
+          self.value = param
+          self.value_u = param_u
+          self.value_l = param_l
+      def sample(self):
+          return np.exp(np.random.uniform(np.log(self.prior_hypp[0]),np.log(self.prior_hypp[1])))
+
+from scipy.special import gamma
+class beta_parameter:
+      """
+      Description
+      -----------
+
+      This class defines a parameter object which has a Beta prior. It serves 
+      to save both the prior and the posterior chains for an easier check of the parameter.
+
+      """
+      def __init__(self,prior_hypp):
+          self.value = 0.5
+          self.init_value = 0.5
+          self.value_u = 0.0
+          self.value_l = 0.0
+          self.has_guess = False
+          self.prior_hypp = prior_hypp
+          self.gamma_alpha = gamma(prior_hypp[0])
+          self.gamma_beta = gamma(prior_hypp[1])
+          self.gamma_sum = gamma(prior_hypp[0]+prior_hypp[1])
+          self.posterior = []
+
+      def get_ln_prior(self):
+          return np.log(self.gamma_sum) + (self.prior_hypp[0]-1.)*np.log(self.value) + \
+                 (self.prior_hypp[1]-1.)*np.log(1.-self.value) - np.log(self.gamma_alpha) - \
+                 np.log(self.gamma_beta)
+
+      def check_value(self,x):
+          if x > 0. and  x < 1.:
+              return True
+          else:
+              return False
+
+      def set_value(self,new_val):
+          self.value = new_val
+
+      def set_init_value(self,new_val):
+          self.init_value = new_val
+          self.has_guess = True
+
+      def set_posterior(self,posterior_chain):
+          self.posterior = posterior_chain
+          param, param_u, param_l = get_quantiles(posterior_chain)
+          self.value = param
+          self.value_u = param_u
+          self.value_l = param_l
+      def sample(self):
+          return np.random.beta(self.prior_hypp[0],self.prior_hypp[1])
+
+class constant_parameter:
+      """
+      Description
+      -----------
+
+      This class defines a parameter object which has a constant value. It serves 
+      to save both the prior and the posterior chains for an easier check of the parameter.
+
+      """
+      def __init__(self,val):
+          self.value = val
+
+def read_epdlc():
+    """
+    This function reads in lightcurves in the epdlc format. It assumes 
+    the directory contains the targetlist.txt file and the epdlc lightcurves of 
+    the corresponding stars in the target list.
+    """
+    lc_names = []
+    fobj = open('targetlist.txt','r')
+    lc_name,ra,dec,mag,mag_err = fobj.readline().split()
+    t,m,merr,x,y = np.loadtxt(lc_name,unpack=True,usecols=(1,2,3,17,18))
+    counter = 0
+    while True:
+        line = fobj.readline()
+        if line == '':
+            break
+        elif line[0]!='#':
+            lc_name,ra,dec,mag,mag_err = line.split()
+            tc,mc,merrc = np.loadtxt(lc_name,unpack=True,usecols=(1,2,3))
+            lc_names.append(lc_name)
+            if counter == 0:
+                X = mc
+                counter = counter + 1
+            else:
+                X = np.vstack((X,mc))
+    out = {}
+    out['times'] = t 
+    out['names'] = lc_names
+    out['lcs'] = X
+    out['target_lc'] = m
+    out['target_lc_err'] = merr
+    out['target_x'] = x
+    out['target_y'] = y
+    return out
+
+from sklearn import linear_model
+def fit_linear_model(X,y,idx=None):
+    """
+    Given a matrix X containing predictors on its rows, a target "y" and optionally a 
+    list of indexes to use for fitting ("idx"), fits the predictors assuming a linear model
+    to the target. This returns the coefficients of the fit and the prediction using all 
+    the predictors.
+    """
+
+    regr = linear_model.LinearRegression(fit_intercept=False)
+    if idx is None:
+        idx = np.arange(X.shape[1])
+    regr.fit(X[:,idx].transpose(),y[idx])
+    coeffs = regr.coef_
+    model = regr.predict(X.transpose())
+    return coeffs,model
+
+import lmfit
+def fit_transit_model(t,f,pdata,ld_law,white_light=True):
+    """
+    This function fits a quick transit model given time, (normalized) flux and pdata, which is a dictionary 
+    that contains prior transit parameters
+    """
+    def residuals(params, x, y):
+        # Generate lightcurve:
+        if white_light:
+            transit_model = get_transit_model(x-pdata['TT'],params['t0'].value,pdata['PER'],params['p'].value,\
+                            params['a'].value,params['i'].value,params['q1'].value,params['q2'].value,\
+                            pdata['ECC'],pdata['OM'],ld_law=ld_law)
+        else:
+            transit_model = get_transit_model(x,pdata['TT'],pdata['PER'],params['p'].value,\
+                            pdata['AR'],pdata['I'],params['q1'].value,params['q2'].value,\
+                            pdata['ECC'],pdata['OM'],ld_law=ld_law)
+        # Get residuals:
+        return ((y - transit_model)*1e6)**2    
+
+    # Initialize parameters of lmfit:
+    prms = lmfit.Parameters()
+    prms.add('p', value = np.sqrt(pdata['DEPTH']), min = np.sqrt(np.min([0,pdata['DEPTH']-\
+                          10.*pdata['DEPTHLOWER']])),max = np.sqrt(pdata['DEPTH']+10.*pdata['DEPTHUPPER']), \
+                          vary = True)
+    prms.add('q1', value = 0.5, min = 0, max = 1, vary = True)
+    if ld_law != 'linear':
+       prms.add('q2', value = 0.5, min = 0, max = 1, vary = True)
+    else:
+       prms.add('q2', value = 0.0, vary = False)
+    if white_light:
+        prms.add('i', value = pdata['I'], min = np.min([0,pdata['I']-10.*pdata['ILOWER']]), \
+                                          max = np.min([90.,pdata['I']+10.*pdata['IUPPER']]), vary = True)
+        prms.add('a', value = pdata['AR'], min = np.min([0,pdata['AR']-10.*pdata['ARLOWER']]),\
+                                           max = pdata['AR']+10.*pdata['ARUPPER'], vary = True)
+        prms.add('t0', value=0.0,min=-(5./24.),max=(5./24.))
+    result = lmfit.minimize(residuals, prms, args=(t,f))
+    if white_light:
+        if ld_law != 'linear':
+            out_params = ['p','t0','q1','q2','i','a']
+        else:
+            out_params = ['p','t0','q1','i','a']
+        transit_model = get_transit_model(t,result.params['t0'].value+pdata['TT'],pdata['PER'],result.params['p'].value,\
+                            result.params['a'].value,result.params['i'].value,result.params['q1'].value,result.params['q2'].value,\
+                            pdata['ECC'],pdata['OM'],ld_law=ld_law)
+    else:
+        if ld_law != 'linear':
+            out_params = ['p','q1','q2']
+        else:
+            out_params = ['p','q1']
+        transit_model = get_transit_model(t,pdata['TT'],pdata['PER'],result.params['p'].value,\
+                            pdata['AR'],pdata['I'],result.params['q1'].value,result.params['q2'].value,\
+                            pdata['ECC'],pdata['OM'],ld_law=ld_law)
+
+    out = {}
+    for par in out_params:
+        out[par] = result.params[par].value
+    return out,transit_model
 
 import jdcal
 import os

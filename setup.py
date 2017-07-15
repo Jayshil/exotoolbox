@@ -7,5 +7,6 @@ setup(name='exotoolbox',
       author='Nestor Espinoza',
       author_email='nsespino@uc.cl',
       license='MIT',
-      packages=['plots','utils'],
+      packages=['exotoolbox'],
+      install_requires=['batman-package','emcee','lmfit'],
       zip_safe=False)
