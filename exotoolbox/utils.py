@@ -762,4 +762,63 @@ def transit_predictor(year,month,pname=None,day=None,P=None,Tdur=None,t0=None,ex
             print '\t Egress      : '+str(tyear)+'-'+str(tmonth)+'-'+str(tday)+' at '+str(thh)+\
                   ':'+str(tmm)+':'+str(tss)+' ('+str(ct0+(pTdur/2.))+' JD)'
             counter = counter + 1
-    
+
+# Define class that stores constants:
+class constants:
+    def __init__(self):
+        # Boltzmann constant:
+        self.kB_val = 1.38064852e-23 # J/K
+        self.kB_val_cgs = 1.38064852e-16 # erg/K
+        # Gravitational constant:
+        self.G_val = 6.67408e-11 # m^3/(kg x s^2)
+        self.G_val_cgs = 6.67408e-8 # cm^3/(g x s^2)
+        # Atomic mass unit:
+        self.amu_val = 1.660539040e-27 # kg
+        self.amu_val_cgs = 1.660539040e-24 # kg
+        # Astronomical unit:
+        self.AU_val = 149597870700. # m
+        self.AU_val_cgs = 149597870700.*1e2 # cm
+        # Solar radius:
+        self.Rsun_val = 6.957e8 # m
+        self.Rsun_val_cgs = 6.957e8*1e2 # cm
+        # Solar mass:
+        self.Msun_val = 1.98855e30 # kg
+        self.Msun_val_cgs = 1.98855e30*1e3 # g
+        # Jupiter radius:
+        self.Rj_val = 7.1492e7 # m
+        self.Rj_val_cgs = 7.1492e7*1e2 # cm
+        # Jupiter mass:
+        self.Mj_val = 1.89813e27 # kg
+        self.Mj_val_cgs = 1.89813e30 # g
+    def kB(self):
+        return self.kB_val
+    def kB_cgs(self):
+        return self.kB_val_cgs
+    def G(self):
+        return self.G_val
+    def G_cgs(self):
+        return self.G_val_cgs
+    def amu(self):
+        return self.amu_val
+    def amu_cgs(self):
+        return self.amu_val_cgs
+    def AU(self):
+        return self.AU_val
+    def AU_cgs(self):
+        return self.AU_val_cgs
+    def Rj(self):
+        return self.Rj_val
+    def Rj_cgs(self):
+        return self.Rj_val_cgs
+    def Rsun(self):
+        return self.Rsun_val
+    def Rsun_cgs(self):
+        return self.Rsun_val_cgs
+    def Msun(self):
+        return self.Msun_val
+    def Msun_cgs(self):
+        return self.Msun_val_cgs
+    def Mj(self):
+        return self.Mj_val
+    def Mj_cgs(self):
+        return self.Mj_val_cgs
