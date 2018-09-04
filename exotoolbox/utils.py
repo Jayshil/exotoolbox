@@ -61,6 +61,52 @@ def get_quantiles(dist,alpha = 0.68, method = 'median'):
           return param,ordered_dist[med_idx+nsamples_at_each_side],\
                  ordered_dist[med_idx-nsamples_at_each_side]
 
+def RA_to_deg(coords):
+    """
+    Given a RA string in hours (e.g., '11:12:12.11'), returns the corresponding 
+    coordinate in degrees.
+    """
+    hh,mm,ss = coords.split(':')
+
+    hours = np.double(hh) + np.double(mm)/60. + np.double(ss)/3600.
+    return hours * 360./24.
+
+def DEC_to_deg(coords):
+    """
+    Given a DEC string in degrees (e.g., '-30:12:12.11'), returns the corresponding 
+    coordinate in degrees.
+    """
+    dd,mm,ss = coords.split(':')
+    if dd[0] == '-':
+        return np.double(dd) - np.double(mm)/60. - np.double(ss)/3600.
+    else:
+        return np.double(dd) + np.double(mm)/60. + np.double(ss)/3600.
+
+
+def get_distance(coords1,coords2):
+    """
+    Given two sets of coordinate strings, calculates the distance in arcminutes 
+    between the objects. 
+
+    INPUT
+
+       coords1      Array, 2 dimensions, string. RA and DEC of first object; 
+                    eg., np.array(['10:42:11','-30:11:13.13'])
+
+       coords2      Array, 2 dimensions, string. RA and DEC of second object; 
+                    eg., np.array(['10:42:11','-30:11:13.13'])
+ 
+    OUTPUT
+
+       Distance between two coordinates, in arcseconds.
+    """
+
+    RA1,DEC1 = RA_to_deg(coords1[0]),DEC_to_deg(coords1[1])
+    RA2,DEC2 = RA_to_deg(coords2[0]),DEC_to_deg(coords2[1])
+
+    return np.sqrt((RA1 - RA2)**2 + (DEC1-DEC2)**2)*3600.0
+
+    
 def mag_to_flux(m,merr):
     """
     Convert magnitude to relative fluxes. 
