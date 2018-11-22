@@ -4,6 +4,30 @@ import emcee
 import sys
 import numpy as np
 
+def read_AIJ_tbl(fname):
+    fin = open(fname,'r')
+    firstime = True
+    out_dict = {}
+    while True:
+        line = fin.readline()
+        if line != '':
+            vec = line.split()
+            if firstime:
+                out_dict['index'] = np.array([])
+                for i in range(len(vec)):
+                    out_dict[vec[i]] = np.array([])
+                firstime = False
+                parameter_vector = ['index'] + vec
+            else:
+                for i in range(len(vec)):
+                    try:
+                        out_dict[parameter_vector[i]] = np.append(out_dict[parameter_vector[i]],np.double(vec[i]))
+                    except:
+                        out_dict[parameter_vector[i]] = np.append(out_dict[parameter_vector[i]],np.nan)
+        else:
+            break
+    return out_dict
+
 def get_MAD_sigma(x,median):
     """
     This function returns the MAD-based standard-deviation.
@@ -160,6 +184,20 @@ def get_transit_model(t,t0,P,p,a,inc,q1,q2,ecc,omega,ld_law):
     else:
         params.u = [coeff1]
     return m.light_curve(params)
+
+def convert_bp(r1,r2,pl,pu):
+    Ar = (pu - pl)/(2. + pl + pu)
+    nsamples = len(r1)
+    p = np.zeros(nsamples)
+    b = np.zeros(nsamples)
+    for i in range(nsamples):
+        if r1[i] > Ar:
+            b[i],p[i] = (1+pl)*(1. + (r1[i]-1.)/(1.-Ar)),\
+                        (1-r2[i])*pl + r2[i]*pu
+        else:
+            b[i],p[i] = (1. + pl) + np.sqrt(r1[i]/Ar)*r2[i]*(pu-pl),\
+                        pu + (pl-pu)*np.sqrt(r1[i]/Ar)*(1.-r2[i])
+    return b,p
 
 def convert_ld_coeffs(ld_law, coeff1, coeff2):
     if ld_law == 'quadratic':
