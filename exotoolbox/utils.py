@@ -20,9 +20,12 @@ def read_NEarchive(fname):
                 parameter_vector = vec
             else:
                 for i in range(len(vec)):
-                    try:
-                        out_dict[parameter_vector[i]] = np.append(out_dict[parameter_vector[i]],np.double(vec[i]))
-                    except:
+                    if vec[i] != '':
+                        try:
+                            out_dict[parameter_vector[i]] = np.append(out_dict[parameter_vector[i]],np.double(vec[i]))
+                        except:
+                            out_dict[parameter_vector[i]] = np.append(out_dict[parameter_vector[i]],vec[i])
+                    else:
                         out_dict[parameter_vector[i]] = np.append(out_dict[parameter_vector[i]],np.nan)
         else:
             break
