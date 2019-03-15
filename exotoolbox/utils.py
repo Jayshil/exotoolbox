@@ -4,6 +4,32 @@ import emcee
 import sys
 import numpy as np
 
+def read_NEarchive(fname):
+    fin = open(fname,'r')
+    firstime = True
+    out_dict = {}
+    while True:
+        line = fin.readline()
+        if line != '':
+          if line[0] != '#':
+            vec = line.split(',')
+            if firstime:
+                for i in range(len(vec)):
+                    out_dict[vec[i]] = np.array([])
+                firstime = False
+                parameter_vector = vec
+                print len(parameter_vector)
+            else:
+                print len(vec)
+                for i in range(len(vec)):
+                    try:
+                        out_dict[parameter_vector[i]] = np.append(out_dict[parameter_vector[i]],np.double(vec[i]))
+                    except:
+                        out_dict[parameter_vector[i]] = np.append(out_dict[parameter_vector[i]],np.nan)
+        else:
+            break
+    return out_dict
+
 def read_AIJ_tbl(fname):
     fin = open(fname,'r')
     firstime = True
@@ -847,6 +873,21 @@ def transit_predictor(year,month,pname=None,day=None,P=None,Tdur=None,t0=None,ex
                   ':'+str(tmm)+':'+str(tss)+' ('+str(ct0+(pTdur/2.))+' JD)'
             counter = counter + 1
 
+def ctimescale(Qp,Rp,Mp,Ms,a,ecc):
+    """
+    Given Qp (tidal quality factor), Rp (planet radius), Mp (planet mass), Ms (Mass of the star), 
+    a (semi-major axis of the orbit of the planet) and ecc (the eccentricity of the orbit), this 
+    function returns the circularization time-scale given in Adams & Laughlin (2006, ApJ, 
+    649, 1004; https://iopscience.iop.org/article/10.1086/506145/meta, equation 2). Masses should be 
+    given in kg, a and R in meters. Returned scale is in seconds.
+    """
+    G = constants().G_val
+    f1 = 4*Qp*Mp*(a**5)/(63.*Ms*(Rp**5))
+    f2 = np.sqrt(a**3/(G*Ms))
+    f3 = (1.-ecc**2)**(13./2.)
+    f4 = 1 + 6*(ecc**2)
+    return f1*f2*f3/f4
+
 # Define class that stores constants:
 class constants:
     def __init__(self):
@@ -874,6 +915,12 @@ class constants:
         # Jupiter mass:
         self.Mj_val = 1.89813e27 # kg
         self.Mj_val_cgs = 1.89813e30 # g
+        # Earth mass:
+        self.Me_val = (1.89813e27)/317.828 # kg
+        self.Me_val_cgs = (1.89813e30)/317.828 # g
+        # Earth radius:
+        self.Re_val = (7.1492e7)/11.21 # m 
+        self.Re_val_cgs = (7.1492e7*1e2)/11.21 # cm
     def kB(self):
         return self.kB_val
     def kB_cgs(self):
@@ -906,3 +953,11 @@ class constants:
         return self.Mj_val
     def Mj_cgs(self):
         return self.Mj_val_cgs
+    def Me(self):
+        return self.Me_val
+    def Me_cgs(self):
+        return self.Me_val_cgs
+    def Re(self):
+        return self.Re_val
+    def Re_cgs(self):
+        return self.Re_val_cgs
