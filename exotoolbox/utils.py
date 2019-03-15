@@ -18,9 +18,7 @@ def read_NEarchive(fname):
                     out_dict[vec[i]] = np.array([])
                 firstime = False
                 parameter_vector = vec
-                print len(parameter_vector)
             else:
-                print len(vec)
                 for i in range(len(vec)):
                     try:
                         out_dict[parameter_vector[i]] = np.append(out_dict[parameter_vector[i]],np.double(vec[i]))
