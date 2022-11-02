@@ -330,8 +330,8 @@ def emcee_transit(t,f,X,priors,ferr = None,fixed_parameters=None,ld_law='quadrat
                     all_mcmc_params.append(par)
                     break
             if not good_prior:
-                print '\t ERROR: prior '+priors[par]['type']+' for parameter '+par+\
-                      ' not supported. Supported priors are: ',supported_priors
+                print('\t ERROR: prior '+priors[par]['type']+' for parameter '+par+\
+                      ' not supported. Supported priors are: ',supported_priors)
                 sys.exit()
                 
         else:
@@ -369,7 +369,7 @@ def emcee_transit(t,f,X,priors,ferr = None,fixed_parameters=None,ld_law='quadrat
             taus = 1.0/(parameters['sigma_w'].value*1e-6/(f*np.log(10.)))**2
             log_like = -0.5*(n_data*log2pi+np.sum(np.log(1./taus)+taus*(residuals**2)))
         else:
-            print 'Noise model '+noise_model+' not supported.'
+            print('Noise model '+noise_model+' not supported.')
             sys.exit()
         return log_like
 
@@ -413,10 +413,10 @@ def emcee_transit(t,f,X,priors,ferr = None,fixed_parameters=None,ld_law='quadrat
             if good_values == True:
                 break
         pos.append(theta_vector) 
-    print '\t >> Starting MCMC...'
+    print('\t >> Starting MCMC...')
     sampler = emcee.EnsembleSampler(nwalkers, n_params, lnprob)
     sampler.run_mcmc(pos, nsteps+nburnin)
-    print '\t >> Done! Saving...'
+    print('\t >> Done! Saving...')
     for i in range(n_params):
         c_param = all_mcmc_params[i]
         c_p_chain = np.array([])
@@ -799,7 +799,7 @@ def transit_predictor(year,month,pname=None,day=None,P=None,Tdur=None,t0=None,ex
         if exo_source == 'TEPCAT':
             exodata = read_tepcat()
         else:
-            print '\t Error in transit_predictor: exo_source '+exo_source+' not found.'
+            print('\t Error in transit_predictor: exo_source '+exo_source+' not found.')
             return 0
     else:
         names = ["User's planet"]
@@ -858,20 +858,20 @@ def transit_predictor(year,month,pname=None,day=None,P=None,Tdur=None,t0=None,ex
         # Now print the transits we found:
         counter = 0
         if len(transits_t0)>0:
-            print 'Transits for '+planet+':'
-            print '--------------------------\n'
+            print('Transits for '+planet+':')
+            print('--------------------------\n')
         for ct0 in transits_t0:
-            print '\t Transit number '+str(counter+1)+':'
-            print '\t ----------------------------'
+            print('\t Transit number '+str(counter+1)+':')
+            print('\t ----------------------------')
             tyear,tmonth,tday,thh,tmm,tss = getCalDay(ct0-(pTdur/2.)) 
-            print '\t Ingress     : '+str(tyear)+'-'+str(tmonth)+'-'+str(tday)+' at '+str(thh)+\
-                  ':'+str(tmm)+':'+str(tss)+' ('+str(ct0-(pTdur/2.))+' JD)'
+            print('\t Ingress     : '+str(tyear)+'-'+str(tmonth)+'-'+str(tday)+' at '+str(thh)+\
+                  ':'+str(tmm)+':'+str(tss)+' ('+str(ct0-(pTdur/2.))+' JD)')
             tyear,tmonth,tday,thh,tmm,tss = getCalDay(ct0)
-            print '\t Mid-transit : '+str(tyear)+'-'+str(tmonth)+'-'+str(tday)+' at '+str(thh)+\
-                  ':'+str(tmm)+':'+str(tss)+' ('+str(ct0)+' JD)'
+            print('\t Mid-transit : '+str(tyear)+'-'+str(tmonth)+'-'+str(tday)+' at '+str(thh)+\
+                  ':'+str(tmm)+':'+str(tss)+' ('+str(ct0)+' JD)')
             tyear,tmonth,tday,thh,tmm,tss = getCalDay(ct0+(pTdur/2.))
-            print '\t Egress      : '+str(tyear)+'-'+str(tmonth)+'-'+str(tday)+' at '+str(thh)+\
-                  ':'+str(tmm)+':'+str(tss)+' ('+str(ct0+(pTdur/2.))+' JD)'
+            print('\t Egress      : '+str(tyear)+'-'+str(tmonth)+'-'+str(tday)+' at '+str(thh)+\
+                  ':'+str(tmm)+':'+str(tss)+' ('+str(ct0+(pTdur/2.))+' JD)')
             counter = counter + 1
 
 def ctimescale(Qp,Rp,Mp,Ms,a,ecc):
