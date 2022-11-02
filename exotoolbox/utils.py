@@ -3,6 +3,7 @@ import batman
 import emcee
 import sys
 import numpy as np
+import astropy.constants as con
 
 def read_NEarchive(fname):
     fin = open(fname,'r')
@@ -893,11 +894,11 @@ def ctimescale(Qp,Rp,Mp,Ms,a,ecc):
 class constants:
     def __init__(self):
         # Boltzmann constant:
-        self.kB_val = 1.38064852e-23 # J/K
-        self.kB_val_cgs = 1.38064852e-16 # erg/K
+        self.kB_val = con.k_B.value # J/K
+        self.kB_val_cgs = con.k_B.cgs.value # erg/K
         # Gravitational constant:
-        self.G_val = 6.67408e-11 # m^3/(kg x s^2)
-        self.G_val_cgs = 6.67408e-8 # cm^3/(g x s^2)
+        self.G_val = con.G.value # m^3/(kg x s^2)
+        self.G_val_cgs = con.G.cgs.value # cm^3/(g x s^2)
         # Atomic mass unit:
         self.amu_val = 1.660539040e-27 # kg
         self.amu_val_cgs = 1.660539040e-24 # kg
@@ -905,23 +906,23 @@ class constants:
         self.AU_val = 149597870700. # m
         self.AU_val_cgs = 149597870700.*1e2 # cm
         # Solar radius:
-        self.Rsun_val = 6.957e8 # m
-        self.Rsun_val_cgs = 6.957e8*1e2 # cm
+        self.Rsun_val = con.R_sun.value # m
+        self.Rsun_val_cgs = con.R_sun.cgs.value # cm
         # Solar mass:
-        self.Msun_val = 1.98855e30 # kg
-        self.Msun_val_cgs = 1.98855e30*1e3 # g
+        self.Msun_val = con.M_sun.value # kg
+        self.Msun_val_cgs = con.M_sun.cgs.value # g
         # Jupiter radius:
-        self.Rj_val = 7.1492e7 # m
-        self.Rj_val_cgs = 7.1492e7*1e2 # cm
+        self.Rj_val = con.R_jup.value # m
+        self.Rj_val_cgs = con.R_jup.cgs.value # cm
         # Jupiter mass:
-        self.Mj_val = 1.89813e27 # kg
-        self.Mj_val_cgs = 1.89813e30 # g
+        self.Mj_val = con.M_jup.value # kg
+        self.Mj_val_cgs = con.M_jup.cgs.value # g
         # Earth mass:
-        self.Me_val = (1.89813e27)/317.828 # kg
-        self.Me_val_cgs = (1.89813e30)/317.828 # g
+        self.Me_val = con.M_earth.value # kg
+        self.Me_val_cgs = con.M_earth.cgs.value # g
         # Earth radius:
-        self.Re_val = (7.1492e7)/11.21 # m 
-        self.Re_val_cgs = (7.1492e7*1e2)/11.21 # cm
+        self.Re_val = con.R_earth.value # m 
+        self.Re_val_cgs = con.R_earth.cgs.value # cm
     def kB(self):
         return self.kB_val
     def kB_cgs(self):
