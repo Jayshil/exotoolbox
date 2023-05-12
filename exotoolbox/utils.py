@@ -906,10 +906,10 @@ def pipe_data(f1, bgmin=300):
         Threshold for background; all points with higher backgrounds
         will be discarded.
         Default is 300 e-/pix
-    -----------
-    return
-    -----------
-    dict :
+    
+    Returns:
+    --------
+    data : dict
         Dictionary containing BJD time, normalized flux with
         errors on it, roll angle, xc, yc, BG, thermFront2 and
         principal components of PSF fitting (U0 to Un)
@@ -947,6 +947,58 @@ def pipe_data(f1, bgmin=300):
     for i in range(len(Us_n)):
         data[Us_n[i]] = Us1[i]
     return data
+
+def tau(per, ar, rprs, bb):
+    """
+    To compute ingress/egress duration from Period, a/R*, Rp/R* and b
+    
+    Parameters:
+    -----------
+    per : float, or numpy.ndarray
+        Orbital period (in days) of the planet
+    aR : float, or numpy.ndarray
+        Scaled semi-major axis, a/R*
+    rprs : float, or numpy.ndarray
+        Planet-to-star radius ratio, Rp/R*
+    bb : float, or numpy.ndarray
+        Impact parameter
+    
+    Returns:
+    --------
+    t12 : float, or numpy.ndarray
+        Transit duration, in days
+    """
+    ab = per/np.pi
+    bc = 1/np.sqrt(1 - bb**2)
+    t12 = ab*bc*rprs/ar
+    return t12
+
+def tdur(per, ar, rprs, bb):
+    """
+    To compute transit/eclipse duration from Period, a/R*, Rp/R* and b
+
+    Parameters:
+    -----------
+    per : float, or numpy.ndarray
+        Orbital period (in days) of the planet
+    aR : float, or numpy.ndarray
+        Scaled semi-major axis, a/R*
+    rprs : float, or numpy.ndarray
+        Planet-to-star radius ratio, Rp/R*
+    bb : float, or numpy.ndarray
+        Impact parameter
+    -----------
+    return
+    -----------
+    t14 : float, or numpy.ndarray
+        Transit duration, in days
+    """
+    ab = per/np.pi
+    cd = (1+rprs)**2 - (bb**2)
+    ef = 1 - ((bb/ar)**2)
+    br1 = (1/ar)*(np.sqrt(cd/ef))
+    t14 = ab*np.arcsin(br1)
+    return t14
 
 # Define class that stores constants:
 class constants:
