@@ -1,3 +1,3 @@
-from exotoolbox import plots
-from exotoolbox import utils
-from exotoolbox import atmospheres
+from .plots import *
+from .utils import *
+from .atmospheres import *

@@ -1,6 +1,6 @@
 import numpy as np
-import utils
-constants = utils.constants()
+from .utils import *
+constants = constants()
 G = constants.G()
 kB = constants.kB()
 amu = constants.amu()
