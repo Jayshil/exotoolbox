@@ -892,7 +892,7 @@ def ctimescale(Qp,Rp,Mp,Ms,a,ecc):
     f4 = 1 + 6*(ecc**2)
     return f1*f2*f3/f4
 
-def pipe_data(f1, bgmin=300):
+def pipe_data(f1, bgmin=300, not_flg_arr=None):
     """
     Function to read PIPE data for CHEOPS
 
@@ -906,6 +906,9 @@ def pipe_data(f1, bgmin=300):
         Threshold for background; all points with higher backgrounds
         will be discarded.
         Default is 300 e-/pix
+    not_flg_arr : ndarray
+        Array containing the other non-zero flags to include while assembling the data.
+        Default is None.
     
     Returns:
     --------
@@ -919,6 +922,10 @@ def pipe_data(f1, bgmin=300):
     # Masking datasets
     flg = np.asarray(tab['FLAG'])                 # Flagged data
     msk = np.where(flg==0)[0]                     # Creating a mask to remove flg>0 values
+    if not_flg_arr is not None:
+        for i in range(len(not_flg_arr)):
+            msk_f1 = np.where(flg==not_flg_arr[i])[0]
+            msk = np.hstack((msk, msk_f1))
     # Gathering dataset
     Us_n = np.array([])
     Us = []
