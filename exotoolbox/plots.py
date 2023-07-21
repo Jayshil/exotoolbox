@@ -63,6 +63,18 @@ def corner_plot(folder, planet_only=False):
     elif 'fp' in lst[0].split('_'):
         cd = p1[lst[0]]*1e6
         lst[0] = lst[0] + ' (in ppm)'
+    elif (lst[0][0:3] == 'p_p') or (lst[0][0:4] == 'p1_p') or (lst[0][0:4] == 'p2_p'):
+        cd = p1[lst[0]]
+        if len(lst[0].split('_')) > 3:
+            lst[0] = '_'.join(lst[0].split('_')[0:3]) + '_et al.'
+        else:
+            lst[0] = lst[0]
+    elif (lst[0][0:2] == 'q1') or (lst[0][0:2] == 'q2'):
+        cd = p1[lst[0]]
+        if len(lst[0].split('_')) > 2:
+            lst[0] = '_'.join(lst[0].split('_')[0:2]) + '_et al.'
+        else:
+            lst[0] = lst[0]
     else:
         cd = p1[lst[0]]
     for i in range(len(lst)-1):
@@ -74,6 +86,18 @@ def corner_plot(folder, planet_only=False):
         elif 'fp' in lst[i+1].split('_'):
             cd = np.vstack((cd, p1[lst[i+1]]*1e6))
             lst[i+1] = lst[i+1] + ' (in ppm)'
+        elif (lst[i+1][0:3] == 'p_p') or (lst[i+1][0:4] == 'p1_p') or (lst[i+1][0:4] == 'p2_p'):
+            cd = np.vstack((cd, p1[lst[i+1]]))
+            if len(lst[i+1].split('_')) > 3:
+                lst[i+1] = '_'.join(lst[i+1].split('_')[0:3]) + '_et al.'
+            else:
+                lst[i+1] = lst[i+1]
+        elif (lst[i+1][0:2] == 'q1') or (lst[i+1][0:2] == 'q2'):
+            cd = np.vstack((cd, p1[lst[i+1]]))
+            if len(lst[i+1].split('_')) > 2:
+                lst[i+1] = '_'.join(lst[i+1].split('_')[0:2]) + '_et al.'
+            else:
+                lst[i+1] = lst[i+1]
         else:
             cd = np.vstack((cd, p1[lst[i+1]]))
     data = np.transpose(cd)
