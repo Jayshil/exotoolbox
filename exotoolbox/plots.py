@@ -49,12 +49,12 @@ def corner_plot(folder, planet_only=False):
     if not planet_only:
         for i in p1.keys():
             gg = i.split('_')
-            if ('p1' in gg) or ('p2' in gg) or ('p3' in gg) or ('p4' in gg) or ('mflux' in gg) or ('sigma' in gg) or ('GP' in gg) or ('mdilution' in gg) or ('q1' in gg) or ('q2' in gg) or (gg[0][0:5] == 'theta'):
+            if ('p1' in gg) or ('p2' in gg) or ('p3' in gg) or ('p4' in gg) or ('rho' in gg) or ('mflux' in gg) or ('sigma' in gg) or ('GP' in gg) or ('mdilution' in gg) or ('q1' in gg) or ('q2' in gg) or (gg[0][0:5] == 'theta'):
                 lst.append(i)
     else:
         for i in p1.keys():
             gg = i.split('_')
-            if 'p1' in gg or 'p2' in gg or 'p3' in gg or 'p4' in gg or 'q1' in gg or 'q2' in gg:
+            if 'p1' in gg or 'p2' in gg or 'p3' in gg or 'p4' in gg or 'q1' in gg or 'q2' in gg or 'rho' in gg:
                 lst.append(i)
     if 't0' in lst[0].split('_'):
         t01 = np.floor(p1[lst[0]][0])
