@@ -6,6 +6,7 @@ import numpy as np
 import astropy.constants as con
 from astropy.io import fits
 from astropy.table import Table
+from astroquery.mast import Observations
 
 def read_NEarchive(fname):
     fin = open(fname,'r')
@@ -954,6 +955,126 @@ def pipe_data(f1, bgmin=300, not_flg_arr=None):
     for i in range(len(Us_n)):
         data[Us_n[i]] = Us1[i]
     return data
+
+def kepler_data(name, pdc=True, long_cadence=True, verbose=True):
+    """
+    To download Kepler/K2 data
+
+    Parameters:
+    -----------
+    name : str
+        Name of the planet
+    pdc : bool
+        Whether to extract PDCSAP flux or not
+        Default is True
+    long_cadence : bool
+        Whether to download long cadence data or not
+        Default is True
+    verbose : bool
+        Boolean on whether to show print updates
+        Default is True
+    -----------
+    return
+        tgz file readable to
+        pycheops
+    """
+    if ('K2' in name) and (not long_cadence):
+        raise Exception('No Short Cadence data available for K2 objects.')
+    try:
+        obt = Observations.query_object(name, radius=0.001)
+    except:
+        raise Exception('The name of the object does not seem to be correct.\nPlease try again...')
+    # b contains indices of the timeseries observations from TESS
+    b = np.array([])
+    for j in range(len(obt['intentType'])):
+        if (obt['obs_collection'][j] == 'Kepler' or obt['obs_collection'][j] == 'K2') and obt['dataproduct_type'][j] == 'timeseries':
+            b = np.hstack((b,j))
+    if len(b) == 0:
+        raise Exception('No Kepler/K2 timeseries data available for this target.\nTry another target...')
+    # To extract obs-id from the observation table
+    pi_name, obsids, exptime, scad, lcad = np.array([]), np.array([]), np.array([]), np.array([]), np.array([])
+    for i in range(len(b)):
+        data1 = obt['dataURL'][int(b[i])]
+        if 'lc' in data1.split('_'):
+            lcad = np.hstack((lcad, b[i]))
+        if 'sc' in data1.split('_'):
+            scad = np.hstack((scad, b[i]))
+        if 'llc.fits' in data1.split('_'):
+            lcad = np.hstack((lcad, b[i]))
+        pi_nm = obt['proposal_pi'][int(b[i])]
+        if type(pi_nm) != str:
+            pi_nm = 'K2 Team'
+        pi_name = np.hstack((pi_name, pi_nm))
+    
+    if long_cadence:
+        dwn_b = lcad
+        keywd = 'Lightcurve Long Cadence'
+    else:
+        dwn_b = scad
+        keywd = 'Lightcurve Short Cadence'
+    
+    for i in range(len(dwn_b)):
+        obsids = np.hstack((obsids, obt['obsid'][int(dwn_b[i])]))
+        exptime = np.hstack((exptime, obt['t_exptime'][int(dwn_b[i])]))
+    
+    disp_kic, disp_sec = [], []
+    
+    # Directory to save the data
+    tim_data, fl_data, fle_data = {}, {}, {}
+
+    for i in range(len(dwn_b)):
+        dpr = Observations.get_product_list(obt[int(dwn_b[i])])
+        cij = []
+        for j in range(len(dpr['obsID'])):
+            if keywd in dpr['description'][j]:
+                cij.append(j)
+        if verbose:
+            print('Data products found over ' + str(len(cij)) + ' quarters/cycles.')
+            print('Downloading them...')
+        for j in range(len(cij)):
+            sector = f"{i:02}" + f"{j:02}" + '-' + dpr['description'][cij[j]].split('- ')[1]
+            
+            # Downloading the data
+            tab = Observations.download_products(dpr[cij[j]])
+            lpt = tab['Local Path'][0][1:]
+            # Reading fits
+            hdul = fits.open(os.getcwd() + lpt)
+            hdr = hdul[0].header
+            kicid = int(hdr['KEPLERID'])
+            kicid = f"{kicid:010}"
+            dta = Table.read(hdul[1])
+            # Available data products
+            try:
+                if pdc:
+                    fl = np.asarray(dta['PDCSAP_FLUX'])
+                    fle = np.asarray(dta['PDCSAP_FLUX_ERR'])
+                else:
+                    fl = np.asarray(dta['SAP_FLUX'])
+                    fle = np.asarray(dta['SAP_FLUX_ERR'])
+            except:
+                continue
+
+            mask = np.isfinite(fl)                                # Creating Mask to remove Nans
+            bjd1 = np.asarray(dta['TIME'])[mask] + hdul[1].header['BJDREFI']
+            fl, fle = fl[mask], fle[mask]                         # Flux and Error in flux without Nans
+
+            tim_data[sector], fl_data[sector], fle_data[sector] = bjd1, fl / np.nanmedian(fl), fle / np.nanmedian(fl)
+            
+            disp_kic.append(kicid)
+            disp_sec.append(sector)
+
+    if verbose:
+        print('----------------------------------------------------------------------------------------')
+        print('Name\t\tKIC-id\t\tSector')
+        print('----------------------------------------------------------------------------------------')
+        for i in range(len(disp_kic)):
+            print(name + '\t\t' + disp_kic[i] + '\t\t' + disp_sec[i])
+
+    # Deleting the data
+    os.system('rm -rf mastDownload')
+
+    return tim_data, fl_data, fle_data
+
 
 def tau(per, ar, rprs, bb):
     """

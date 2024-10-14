@@ -8,5 +8,5 @@ setup(name='exotoolbox',
       author_email='nsespino@uc.cl',
       license='MIT',
       packages=['exotoolbox'],
-      install_requires=['batman-package','emcee','lmfit','astropy','corner'],
+      install_requires=['batman-package','emcee','lmfit','astropy','corner','astroquery'],
       zip_safe=False)
